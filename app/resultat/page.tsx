@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -320,6 +320,23 @@ function ResultatContent() {
   const searchParams = useSearchParams()
   const flow = searchParams.get("flow") || ""
   const answersParam = searchParams.get("answers")
+  const [propertyPlans, setPropertyPlans] = useState<
+    { title?: string; id?: string }[]
+  >([])
+
+  useEffect(() => {
+    const storedPlans = sessionStorage.getItem("propertyPlans")
+    if (!storedPlans) return
+
+    try {
+      const parsed = JSON.parse(storedPlans)
+      if (Array.isArray(parsed)) {
+        setPropertyPlans(parsed)
+      }
+    } catch (error) {
+      console.error("Kunne ikke lese eiendomsplaner:", error)
+    }
+  }, [])
 
   const answers = answersParam ? JSON.parse(answersParam) : {}
   const result = calculateResult(flow, answers)
@@ -344,6 +361,24 @@ function ResultatContent() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-8 space-y-6">
+        {propertyPlans.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium">
+                Planer for eiendommen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                {propertyPlans.map((plan, index) => (
+                  <li key={`${plan.id ?? plan.title ?? "plan"}-${index}`}>
+                    {plan.title ?? "Ukjent plan"}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
         {/* Status Badge */}
         <Card className={cn("border-2", config.borderClass)}>
           <CardContent className="pt-6">

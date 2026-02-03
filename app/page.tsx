@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
@@ -91,6 +92,12 @@ const quickStartScenarios = [
 export default function StartPage() {
   const router = useRouter()
   const [description, setDescription] = useState("")
+  const [gnr, setGnr] = useState("")
+  const [bnr, setBnr] = useState("")
+  const [address, setAddress] = useState("")
+  const [propertyPlans, setPropertyPlans] = useState<string[]>([])
+  const [propertyError, setPropertyError] = useState<string | null>(null)
+  const [propertyLoading, setPropertyLoading] = useState(false)
 
   const handleSubmit = () => {
     if (!description.trim()) return
@@ -114,6 +121,42 @@ export default function StartPage() {
 
   const handleQuickStart = (flowId: string) => {
     router.push(`/veileder?flow=${flowId}`)
+  }
+
+  const handlePropertyLookup = async () => {
+    setPropertyLoading(true)
+    setPropertyError(null)
+    setPropertyPlans([])
+
+    try {
+      const response = await fetch("/api/eiendom/planer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gnr: gnr.trim(),
+          bnr: bnr.trim(),
+          address: address.trim(),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setPropertyError(
+          data?.error || "Kunne ikke hente planer for eiendommen.",
+        )
+        return
+      }
+
+      const plans = Array.isArray(data?.plans) ? data.plans : []
+      setPropertyPlans(plans.map((plan: { title?: string }) => plan.title || ""))
+      sessionStorage.setItem("propertyPlans", JSON.stringify(plans))
+    } catch (error) {
+      setPropertyError("Kunne ikke hente planer. Prøv igjen senere.")
+      console.error(error)
+    } finally {
+      setPropertyLoading(false)
+    }
   }
 
   return (
@@ -215,6 +258,78 @@ export default function StartPage() {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Property lookup */}
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-foreground">
+                  Sjekk hvilke planer som gjelder for eiendommen din
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Legg inn gårds- og bruksnummer eller adresse for å hente
+                  relevante planer.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Gnr
+                  </label>
+                  <Input
+                    value={gnr}
+                    onChange={(e) => setGnr(e.target.value)}
+                    placeholder="Gnr"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Bnr
+                  </label>
+                  <Input
+                    value={bnr}
+                    onChange={(e) => setBnr(e.target.value)}
+                    placeholder="Bnr"
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Adresse
+                  </label>
+                  <Input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Adresse"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Button
+                  onClick={handlePropertyLookup}
+                  disabled={propertyLoading || (!gnr && !bnr && !address)}
+                >
+                  {propertyLoading ? "Henter..." : "Hent planer"}
+                </Button>
+                {propertyError && (
+                  <span className="text-sm text-destructive">{propertyError}</span>
+                )}
+              </div>
+              {propertyPlans.length > 0 && (
+                <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
+                  <p className="font-medium text-foreground">
+                    Planer funnet for eiendommen:
+                  </p>
+                  <ul className="mt-2 list-disc pl-5 text-muted-foreground">
+                    {propertyPlans.map((plan, index) => (
+                      <li key={`${plan}-${index}`}>
+                        {plan || "Ukjent plan"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
 
