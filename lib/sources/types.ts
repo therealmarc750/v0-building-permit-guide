@@ -13,7 +13,12 @@ export type FlowType =
   | "tilbygg"
   | "fasadeendring"
   | "bruksendring"
-  | "riving";
+  | "riving"
+  | "paabygg"
+  | "terrasse"
+  | "bod"
+  | "takendring"
+  | "stottemur";
 
 export interface ReviewFlags {
   is_official: boolean;
@@ -82,6 +87,11 @@ export const FLOW_LABELS: Record<FlowType, string> = {
   fasadeendring: "Fasadeendring",
   bruksendring: "Bruksendring",
   riving: "Riving",
+  paabygg: "Påbygg",
+  terrasse: "Terrasse/Veranda",
+  bod: "Bod/Uthus/Anneks",
+  takendring: "Takendring",
+  stottemur: "Støttemur/Gjerde",
 };
 
 export const REVIEW_FLAG_LABELS: Record<keyof ReviewFlags, string> = {

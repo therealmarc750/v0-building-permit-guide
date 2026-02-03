@@ -141,6 +141,119 @@ const vinduFlow: Flow = {
   ],
 }
 
+const fasadeFlow: Flow = {
+  ...vinduFlow,
+  id: "fasadeendring",
+  title: "Vindu eller fasadeendring",
+}
+
+const createPrototypeFlow = (id: string, title: string): Flow => ({
+  id,
+  title,
+  questions: [
+    {
+      id: `${id}-area`,
+      text: "Hvor stort areal gjelder tiltaket?",
+      helpText: "Oppgi omtrentlige kvadratmeter der det er relevant",
+      type: "number",
+      unit: "m²",
+      min: 0,
+      max: 1000,
+    },
+    {
+      id: `${id}-height`,
+      text: "Hvor høy blir løsningen på det høyeste punktet?",
+      type: "number",
+      unit: "meter",
+      min: 0,
+      max: 50,
+    },
+    {
+      id: `${id}-distance`,
+      text: "Hvor langt fra nabogrensen skal tiltaket stå?",
+      type: "number",
+      unit: "meter",
+      min: 0,
+      max: 100,
+    },
+    {
+      id: `${id}-regulated`,
+      text: "Ligger eiendommen i et regulert område?",
+      type: "yesno",
+    },
+    {
+      id: `${id}-special`,
+      text: "Er det spesielle hensyn på tomten?",
+      helpText: "F.eks. kulturminner, flom, ras eller strandsone",
+      type: "yesno",
+    },
+  ],
+})
+
+const prototypeFlows: Flow[] = [
+  createPrototypeFlow("tilbygg", "Tilbygg"),
+  createPrototypeFlow("paabygg", "Påbygg"),
+  createPrototypeFlow("terrasse", "Terrasse eller veranda"),
+  createPrototypeFlow("bod", "Bod, uthus eller anneks"),
+  createPrototypeFlow("takendring", "Takendring"),
+  createPrototypeFlow("stottemur", "Støttemur eller gjerde"),
+  createPrototypeFlow("bruksendring", "Bruksendring"),
+  createPrototypeFlow("riving", "Riving"),
+]
+
+const flowCards: { flow: Flow; description: string; icon: typeof Home }[] = [
+  {
+    flow: garasjeFlow,
+    description: "Frittliggende bygg for bil",
+    icon: Home,
+  },
+  {
+    flow: fasadeFlow,
+    description: "Endring av fasade, vindu eller dør",
+    icon: Layers,
+  },
+  {
+    flow: prototypeFlows.find((flow) => flow.id === "tilbygg")!,
+    description: "Utvidelse av eksisterende bolig",
+    icon: Home,
+  },
+  {
+    flow: prototypeFlows.find((flow) => flow.id === "paabygg")!,
+    description: "Ny etasje eller takoppløft",
+    icon: Home,
+  },
+  {
+    flow: prototypeFlows.find((flow) => flow.id === "terrasse")!,
+    description: "Terrasse, platting eller veranda",
+    icon: Home,
+  },
+  {
+    flow: prototypeFlows.find((flow) => flow.id === "bod")!,
+    description: "Små frittstående bygg",
+    icon: Home,
+  },
+  {
+    flow: prototypeFlows.find((flow) => flow.id === "takendring")!,
+    description: "Takvinduer eller endret takform",
+    icon: Layers,
+  },
+  {
+    flow: prototypeFlows.find((flow) => flow.id === "stottemur")!,
+    description: "Terrengmurer og gjerder",
+    icon: Home,
+  },
+  {
+    flow: prototypeFlows.find((flow) => flow.id === "bruksendring")!,
+    description: "Kjeller/loft til bolig",
+    icon: Layers,
+  },
+  {
+    flow: prototypeFlows.find((flow) => flow.id === "riving")!,
+    description: "Rive bygg eller deler av bygg",
+    icon: Home,
+  },
+]
+
 function VeilederContent() {
   const router = useRouter()
   const [flowParam, setFlowParam] = useState<string | null>(null)
@@ -154,8 +267,13 @@ function VeilederContent() {
     setFlowParam(flow)
     if (flow === "garasje") {
       setSelectedFlow(garasjeFlow)
-    } else if (flow === "vindu") {
-      setSelectedFlow(vinduFlow)
+    } else if (flow === "vindu" || flow === "fasadeendring") {
+      setSelectedFlow(fasadeFlow)
+    } else if (flow) {
+      const prototypeFlow = prototypeFlows.find((item) => item.id === flow)
+      if (prototypeFlow) {
+        setSelectedFlow(prototypeFlow)
+      }
     }
   }, [])
 
@@ -224,43 +342,25 @@ function VeilederContent() {
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Card
-                className="cursor-pointer transition-colors hover:border-primary/50 hover:bg-muted/50"
-                onClick={() => handleFlowSelect(garasjeFlow)}
-              >
-                <CardContent className="flex items-start gap-4 pt-6">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <Home className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="space-y-1">
-                    <h4 className="font-medium text-foreground">
-                      Garasje eller carport
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      Frittliggende bygg for bil
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card
-                className="cursor-pointer transition-colors hover:border-primary/50 hover:bg-muted/50"
-                onClick={() => handleFlowSelect(vinduFlow)}
-              >
-                <CardContent className="flex items-start gap-4 pt-6">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <Layers className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="space-y-1">
-                    <h4 className="font-medium text-foreground">
-                      Vindu eller fasadeendring
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      Endring av fasade, vindu eller dør
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              {flowCards.map(({ flow, description, icon: Icon }) => (
+                <Card
+                  key={flow.id}
+                  className="cursor-pointer transition-colors hover:border-primary/50 hover:bg-muted/50"
+                  onClick={() => handleFlowSelect(flow)}
+                >
+                  <CardContent className="flex items-start gap-4 pt-6">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <Icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-medium text-foreground">{flow.title}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {description}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
         </main>
