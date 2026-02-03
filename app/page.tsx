@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
@@ -24,40 +25,138 @@ const quickStartScenarios = [
     keywords: ["garasje", "carport"],
   },
   {
-    id: "vindu",
+    id: "tilbygg",
+    title: "Tilbygg",
+    description: "Utvidelse av eksisterende bolig",
+    icon: Home,
+    keywords: ["tilbygg", "tilbygging", "tilbyggs", "tilbygge"],
+  },
+  {
+    id: "paabygg",
+    title: "Påbygg",
+    description: "Ny etasje eller takoppløft",
+    icon: Home,
+    keywords: ["påbygg", "paabygg", "takoppløft", "ekstra etasje"],
+  },
+  {
+    id: "terrasse",
+    title: "Terrasse eller veranda",
+    description: "Terrasse, platting eller veranda",
+    icon: Home,
+    keywords: ["terrasse", "veranda", "platting", "balkong"],
+  },
+  {
+    id: "bod",
+    title: "Bod, uthus eller anneks",
+    description: "Små frittstående bygg",
+    icon: Home,
+    keywords: ["bod", "uthus", "anneks", "redskapsbod"],
+  },
+  {
+    id: "fasadeendring",
     title: "Vindu eller fasadeendring",
     description: "Endring av fasade, vindu eller dør",
     icon: Layers,
-    keywords: ["vindu", "fasade", "dør"],
+    keywords: ["vindu", "fasade", "dør", "fasadeendring"],
+  },
+  {
+    id: "takendring",
+    title: "Takendring",
+    description: "Takvinduer eller endret takform",
+    icon: Layers,
+    keywords: ["tak", "takendring", "takvindu", "ark"],
+  },
+  {
+    id: "stottemur",
+    title: "Støttemur eller gjerde",
+    description: "Terrengmurer og gjerder",
+    icon: Home,
+    keywords: ["støttemur", "stottemur", "mur", "gjerde"],
+  },
+  {
+    id: "bruksendring",
+    title: "Bruksendring",
+    description: "Kjeller/loft til bolig",
+    icon: Layers,
+    keywords: ["bruksendring", "kjeller", "loft", "til bolig", "hybel"],
+  },
+  {
+    id: "riving",
+    title: "Riving",
+    description: "Rive bygg eller deler av bygg",
+    icon: Home,
+    keywords: ["riving", "rive", "rivning", "demontere"],
   },
 ]
 
 export default function StartPage() {
   const router = useRouter()
   const [description, setDescription] = useState("")
+  const [gnr, setGnr] = useState("")
+  const [bnr, setBnr] = useState("")
+  const [address, setAddress] = useState("")
+  const [propertyPlans, setPropertyPlans] = useState<string[]>([])
+  const [propertyError, setPropertyError] = useState<string | null>(null)
+  const [propertyLoading, setPropertyLoading] = useState(false)
 
   const handleSubmit = () => {
     if (!description.trim()) return
 
     const lowerDesc = description.toLowerCase()
 
-    // Detect keywords and route to appropriate flow
-    if (lowerDesc.includes("garasje") || lowerDesc.includes("carport")) {
-      router.push(`/veileder?flow=garasje&desc=${encodeURIComponent(description)}`)
-    } else if (
-      lowerDesc.includes("vindu") ||
-      lowerDesc.includes("fasade") ||
-      lowerDesc.includes("kjeller")
-    ) {
-      router.push(`/veileder?flow=vindu&desc=${encodeURIComponent(description)}`)
-    } else {
-      // Show type selection
-      router.push(`/veileder?flow=velg&desc=${encodeURIComponent(description)}`)
+    const matchedScenario = quickStartScenarios.find((scenario) =>
+      scenario.keywords.some((keyword) => lowerDesc.includes(keyword)),
+    )
+
+    if (matchedScenario) {
+      router.push(
+        `/veileder?flow=${matchedScenario.id}&desc=${encodeURIComponent(description)}`,
+      )
+      return
     }
+
+    // Show type selection if no keywords match
+    router.push(`/veileder?flow=velg&desc=${encodeURIComponent(description)}`)
   }
 
   const handleQuickStart = (flowId: string) => {
     router.push(`/veileder?flow=${flowId}`)
+  }
+
+  const handlePropertyLookup = async () => {
+    setPropertyLoading(true)
+    setPropertyError(null)
+    setPropertyPlans([])
+
+    try {
+      const response = await fetch("/api/eiendom/planer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gnr: gnr.trim(),
+          bnr: bnr.trim(),
+          address: address.trim(),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setPropertyError(
+          data?.error || "Kunne ikke hente planer for eiendommen.",
+        )
+        return
+      }
+
+      const plans = Array.isArray(data?.plans) ? data.plans : []
+      setPropertyPlans(plans.map((plan: { title?: string }) => plan.title || ""))
+      sessionStorage.setItem("propertyPlans", JSON.stringify(plans))
+    } catch (error) {
+      setPropertyError("Kunne ikke hente planer. Prøv igjen senere.")
+      console.error(error)
+    } finally {
+      setPropertyLoading(false)
+    }
   }
 
   return (
@@ -159,6 +258,78 @@ export default function StartPage() {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Property lookup */}
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-foreground">
+                  Sjekk hvilke planer som gjelder for eiendommen din
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Legg inn gårds- og bruksnummer eller adresse for å hente
+                  relevante planer.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Gnr
+                  </label>
+                  <Input
+                    value={gnr}
+                    onChange={(e) => setGnr(e.target.value)}
+                    placeholder="Gnr"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Bnr
+                  </label>
+                  <Input
+                    value={bnr}
+                    onChange={(e) => setBnr(e.target.value)}
+                    placeholder="Bnr"
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Adresse
+                  </label>
+                  <Input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Adresse"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Button
+                  onClick={handlePropertyLookup}
+                  disabled={propertyLoading || (!gnr && !bnr && !address)}
+                >
+                  {propertyLoading ? "Henter..." : "Hent planer"}
+                </Button>
+                {propertyError && (
+                  <span className="text-sm text-destructive">{propertyError}</span>
+                )}
+              </div>
+              {propertyPlans.length > 0 && (
+                <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
+                  <p className="font-medium text-foreground">
+                    Planer funnet for eiendommen:
+                  </p>
+                  <ul className="mt-2 list-disc pl-5 text-muted-foreground">
+                    {propertyPlans.map((plan, index) => (
+                      <li key={`${plan}-${index}`}>
+                        {plan || "Ukjent plan"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
 
