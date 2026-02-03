@@ -24,11 +24,67 @@ const quickStartScenarios = [
     keywords: ["garasje", "carport"],
   },
   {
-    id: "vindu",
+    id: "tilbygg",
+    title: "Tilbygg",
+    description: "Utvidelse av eksisterende bolig",
+    icon: Home,
+    keywords: ["tilbygg", "tilbygging", "tilbyggs", "tilbygge"],
+  },
+  {
+    id: "paabygg",
+    title: "Påbygg",
+    description: "Ny etasje eller takoppløft",
+    icon: Home,
+    keywords: ["påbygg", "paabygg", "takoppløft", "ekstra etasje"],
+  },
+  {
+    id: "terrasse",
+    title: "Terrasse eller veranda",
+    description: "Terrasse, platting eller veranda",
+    icon: Home,
+    keywords: ["terrasse", "veranda", "platting", "balkong"],
+  },
+  {
+    id: "bod",
+    title: "Bod, uthus eller anneks",
+    description: "Små frittstående bygg",
+    icon: Home,
+    keywords: ["bod", "uthus", "anneks", "redskapsbod"],
+  },
+  {
+    id: "fasadeendring",
     title: "Vindu eller fasadeendring",
     description: "Endring av fasade, vindu eller dør",
     icon: Layers,
-    keywords: ["vindu", "fasade", "dør"],
+    keywords: ["vindu", "fasade", "dør", "fasadeendring"],
+  },
+  {
+    id: "takendring",
+    title: "Takendring",
+    description: "Takvinduer eller endret takform",
+    icon: Layers,
+    keywords: ["tak", "takendring", "takvindu", "ark"],
+  },
+  {
+    id: "stottemur",
+    title: "Støttemur eller gjerde",
+    description: "Terrengmurer og gjerder",
+    icon: Home,
+    keywords: ["støttemur", "stottemur", "mur", "gjerde"],
+  },
+  {
+    id: "bruksendring",
+    title: "Bruksendring",
+    description: "Kjeller/loft til bolig",
+    icon: Layers,
+    keywords: ["bruksendring", "kjeller", "loft", "til bolig", "hybel"],
+  },
+  {
+    id: "riving",
+    title: "Riving",
+    description: "Rive bygg eller deler av bygg",
+    icon: Home,
+    keywords: ["riving", "rive", "rivning", "demontere"],
   },
 ]
 
@@ -41,19 +97,19 @@ export default function StartPage() {
 
     const lowerDesc = description.toLowerCase()
 
-    // Detect keywords and route to appropriate flow
-    if (lowerDesc.includes("garasje") || lowerDesc.includes("carport")) {
-      router.push(`/veileder?flow=garasje&desc=${encodeURIComponent(description)}`)
-    } else if (
-      lowerDesc.includes("vindu") ||
-      lowerDesc.includes("fasade") ||
-      lowerDesc.includes("kjeller")
-    ) {
-      router.push(`/veileder?flow=vindu&desc=${encodeURIComponent(description)}`)
-    } else {
-      // Show type selection
-      router.push(`/veileder?flow=velg&desc=${encodeURIComponent(description)}`)
+    const matchedScenario = quickStartScenarios.find((scenario) =>
+      scenario.keywords.some((keyword) => lowerDesc.includes(keyword)),
+    )
+
+    if (matchedScenario) {
+      router.push(
+        `/veileder?flow=${matchedScenario.id}&desc=${encodeURIComponent(description)}`,
+      )
+      return
     }
+
+    // Show type selection if no keywords match
+    router.push(`/veileder?flow=velg&desc=${encodeURIComponent(description)}`)
   }
 
   const handleQuickStart = (flowId: string) => {

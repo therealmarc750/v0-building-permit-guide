@@ -155,7 +155,7 @@ function calculateResult(
   }
 
   // Window/Facade flow logic
-  if (flow === "vindu") {
+  if (flow === "vindu" || flow === "fasadeendring") {
     const endringstype = answers.v1
     const fredet = answers.v2
     const spesielleKrav = answers.v3
@@ -247,6 +247,35 @@ function calculateResult(
           url: "https://lovdata.no/dokument/SF/forskrift/2010-03-26-488/KAPITTEL_5#%C2%A75-1",
         },
       ],
+    }
+  }
+
+  const prototypeFlows = new Set([
+    "tilbygg",
+    "paabygg",
+    "terrasse",
+    "bod",
+    "takendring",
+    "stottemur",
+    "bruksendring",
+    "riving",
+  ])
+
+  if (prototypeFlows.has(flow)) {
+    return {
+      status: "ansvarlig",
+      title: "Prototyp-svar for valgt prosjekttype",
+      description:
+        "Dette er en prototyp med standardvurdering. Det trengs ofte nærmere vurdering basert på lokale regler og detaljer i tiltaket.",
+      conditions: [
+        "Oppgi detaljer om areal, høyde og plassering når du tar kontakt",
+        "Sjekk reguleringsplan og eventuelle hensyn på tomten",
+      ],
+      nextSteps: [
+        "Kontakt kommunen for en konkret vurdering",
+        "Forbered en enkel skisse og beskrivelse av tiltaket",
+      ],
+      sources: [],
     }
   }
 
