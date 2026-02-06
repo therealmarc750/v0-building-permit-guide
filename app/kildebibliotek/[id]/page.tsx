@@ -43,8 +43,9 @@ import {
   XCircle,
   Clock,
   RefreshCw,
+  Plus,
 } from "lucide-react";
-import type { Source, SourceStatus, SourceCategory, FlowType, ReviewFlags } from "@/lib/sources/types";
+import type { Source, SourceStatus, SourceCategory, FlowType, ReviewFlags, RuleCandidate } from "@/lib/sources/types";
 import { CATEGORY_LABELS, STATUS_LABELS, FLOW_LABELS, REVIEW_FLAG_LABELS, DEFAULT_REVIEW_FLAGS } from "@/lib/sources/types";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -84,6 +85,20 @@ export default function SourceDetailPage({
   const [saving, setSaving] = useState(false);
   const [refetching, setRefetching] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [candidates, setCandidates] = useState<RuleCandidate[]>([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(true);
+  const [generatingCandidates, setGeneratingCandidates] = useState(false);
+  const [candidateError, setCandidateError] = useState("");
+  const [chunks, setChunks] = useState<Array<{ id: string; ordinal: number; heading: string | null; text: string }>>([]);
+  const [loadingChunks, setLoadingChunks] = useState(true);
+  const [creatingRuleForChunk, setCreatingRuleForChunk] = useState<string | null>(null);
+  const [ruleProjectType, setRuleProjectType] = useState("garasje");
+  const [ruleOutcome, setRuleOutcome] = useState<"søknadspliktig" | "unntatt" | "avhenger">("avhenger");
+  const [ruleTitle, setRuleTitle] = useState("");
+  const [ruleExplanation, setRuleExplanation] = useState("");
+  const [ruleConditions, setRuleConditions] = useState("{}");
+  const [ruleIsActive, setRuleIsActive] = useState(false);
+  const [ruleError, setRuleError] = useState("");
 
   // Editable fields
   const [category, setCategory] = useState<SourceCategory | "none">("none");
@@ -97,7 +112,25 @@ export default function SourceDetailPage({
 
   useEffect(() => {
     fetchSource();
+    fetchCandidates();
+    fetchChunks();
   }, [id]);
+
+  async function fetchChunks() {
+    setLoadingChunks(true);
+    try {
+      const res = await fetch(`/api/sources/${id}/chunks`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Kunne ikke hente tekstblokker");
+      }
+      setChunks(data);
+    } catch (error) {
+      console.error("Failed to fetch chunks:", error);
+    } finally {
+      setLoadingChunks(false);
+    }
+  }
 
   async function fetchSource() {
     try {
@@ -120,6 +153,59 @@ export default function SourceDetailPage({
       router.push("/kildebibliotek");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchCandidates() {
+    setLoadingCandidates(true);
+    try {
+      const res = await fetch(`/api/sources/${id}/candidates`);
+      if (!res.ok) {
+        throw new Error("Kunne ikke hente regelutkast");
+      }
+      const data = await res.json();
+      setCandidates(data);
+    } catch (error) {
+      console.error("Failed to fetch candidates:", error);
+    } finally {
+      setLoadingCandidates(false);
+    }
+  }
+
+  async function handleGenerateCandidates() {
+    setGeneratingCandidates(true);
+    setCandidateError("");
+    try {
+      const res = await fetch(`/api/sources/${id}/generate-candidates`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Kunne ikke generere regelutkast");
+      }
+      await fetchCandidates();
+    } catch (error) {
+      setCandidateError(error instanceof Error ? error.message : "Ukjent feil");
+    } finally {
+      setGeneratingCandidates(false);
+    }
+  }
+
+  async function handleCandidateStatus(candidateId: string, status: "approved" | "rejected") {
+    setCandidateError("");
+    try {
+      const res = await fetch(`/api/rule-candidates/${candidateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Kunne ikke oppdatere regelutkast");
+      }
+      await fetchCandidates();
+    } catch (error) {
+      setCandidateError(error instanceof Error ? error.message : "Ukjent feil");
     }
   }
 
@@ -180,36 +266,60 @@ export default function SourceDetailPage({
 
     setRefetching(true);
     try {
-      const fetchRes = await fetch("/api/sources/fetch", {
+      const fetchRes = await fetch("/api/sources/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: source.url }),
       });
 
       if (!fetchRes.ok) {
-        throw new Error("Failed to refetch");
+        const payload = await fetchRes.json();
+        throw new Error(payload.error || "Failed to refetch");
       }
-
-      const fetchedData = await fetchRes.json();
-
-      const updateRes = await fetch(`/api/sources/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: fetchedData.title,
-          fetchedHtml: fetchedData.fetchedHtml,
-          extractedText: fetchedData.extractedText,
-        }),
-      });
-
-      if (updateRes.ok) {
-        const updated = await updateRes.json();
-        setSource(updated);
-      }
+      await fetchSource();
+      await fetchChunks();
     } catch (error) {
       console.error("Failed to refetch:", error);
     } finally {
       setRefetching(false);
+    }
+  }
+
+  async function handleCreateRuleFromChunk(chunkId: string) {
+    setRuleError("");
+    let parsedConditions: unknown = {};
+    try {
+      parsedConditions = JSON.parse(ruleConditions);
+    } catch {
+      setRuleError("Ugyldig JSON i vilkår");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/sources/${id}/rules`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chunkId,
+          projectType: ruleProjectType,
+          outcome: ruleOutcome,
+          title: ruleTitle,
+          explanation: ruleExplanation,
+          conditions: parsedConditions,
+          isActive: ruleIsActive,
+          priority: 100,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Kunne ikke opprette regel");
+      }
+      setCreatingRuleForChunk(null);
+      setRuleTitle("");
+      setRuleExplanation("");
+      setRuleConditions("{}");
+    } catch (error) {
+      setRuleError(error instanceof Error ? error.message : "Ukjent feil");
     }
   }
 
@@ -276,8 +386,137 @@ export default function SourceDetailPage({
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-8">
+        {source.fetchStatus === "failed" && (
+          <div className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+            Kunne ikke hente innhold: {source.fetchError || "Ukjent feil"}
+          </div>
+        )}
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-lg">Regelutkast</CardTitle>
+                    <CardDescription>
+                      Utkast generert fra kildeteksten. Godkjenn for å legge til i veiledningen.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleGenerateCandidates}
+                    disabled={generatingCandidates}
+                  >
+                    {generatingCandidates ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Genererer...
+                      </>
+                    ) : (
+                      "Generer regelutkast"
+                    )}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {candidateError && (
+                  <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                    {candidateError}
+                  </div>
+                )}
+                {loadingCandidates ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Laster regelutkast...
+                  </div>
+                ) : candidates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Ingen regelutkast funnet for denne kilden.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {candidates.map((candidate) => (
+                      <div key={candidate.id} className="rounded-lg border p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="font-medium">{candidate.title}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {candidate.explanation}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {candidate.outcome}
+                          </Badge>
+                        </div>
+
+                        <div className="rounded bg-muted/40 p-3 text-xs text-muted-foreground">
+                          <p className="font-medium text-foreground mb-1">Vilkår</p>
+                          <pre className="whitespace-pre-wrap">
+                            {JSON.stringify(candidate.conditions, null, 2)}
+                          </pre>
+                        </div>
+
+                        {candidate.citations.length > 0 && (
+                          <div className="space-y-2 text-sm">
+                            <p className="text-xs font-medium text-muted-foreground">Sitat</p>
+                            {candidate.citations.map((citation, index) => (
+                              <div key={`${candidate.id}-${index}`} className="rounded border p-3">
+                                <p className="text-sm italic text-muted-foreground">
+                                  &quot;{citation.excerpt}&quot;
+                                </p>
+                                <div className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
+                                  {citation.locationHint && (
+                                    <span>Plassering: {citation.locationHint}</span>
+                                  )}
+                                  {source?.url && (
+                                    <a
+                                      href={source.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1 text-primary hover:underline"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                      Åpne kilde
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleCandidateStatus(candidate.id, "approved")}
+                            disabled={candidate.status !== "draft" || !candidate.projectType}
+                          >
+                            Godkjenn
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleCandidateStatus(candidate.id, "rejected")}
+                            disabled={candidate.status !== "draft"}
+                          >
+                            Avvis
+                          </Button>
+                          <span className="text-xs text-muted-foreground">
+                            Status: {candidate.status}
+                          </span>
+                          {!candidate.projectType && (
+                            <span className="text-xs text-amber-600">
+                              Mangler prosjekttype
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Kvalitetssjekk</CardTitle>
@@ -395,6 +634,100 @@ export default function SourceDetailPage({
                     Legg til
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Tekstblokker</CardTitle>
+                <CardDescription>
+                  Automatisk oppdelte seksjoner brukt for regler og sitater
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {ruleError && (
+                  <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                    {ruleError}
+                  </div>
+                )}
+                {loadingChunks ? (
+                  <div className="text-sm text-muted-foreground">Laster tekstblokker...</div>
+                ) : chunks.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">Ingen tekstblokker opprettet enda.</div>
+                ) : (
+                  <div className="space-y-3 max-h-[420px] overflow-y-auto">
+                    {chunks.map((chunk) => (
+                      <div key={chunk.id} className="rounded border p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Blokk #{chunk.ordinal}</p>
+                            <p className="font-medium text-sm">{chunk.heading || "Uten overskrift"}</p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setCreatingRuleForChunk(chunk.id);
+                              setRuleTitle(chunk.heading || "Regel fra kilde");
+                              setRuleExplanation(chunk.text.slice(0, 240));
+                            }}
+                          >
+                            <Plus className="mr-1 h-3 w-3" />
+                            Lag regel
+                          </Button>
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-3">{chunk.text}</p>
+
+                        {creatingRuleForChunk === chunk.id && (
+                          <div className="rounded border bg-muted/30 p-3 space-y-2">
+                            <div className="grid gap-2 md:grid-cols-2">
+                              <Input
+                                placeholder="Prosjekttype"
+                                value={ruleProjectType}
+                                onChange={(e) => setRuleProjectType(e.target.value)}
+                              />
+                              <Select value={ruleOutcome} onValueChange={(v) => setRuleOutcome(v as "søknadspliktig" | "unntatt" | "avhenger")}>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="søknadspliktig">søknadspliktig</SelectItem>
+                                  <SelectItem value="unntatt">unntatt</SelectItem>
+                                  <SelectItem value="avhenger">avhenger</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Input
+                              placeholder="Regeltittel"
+                              value={ruleTitle}
+                              onChange={(e) => setRuleTitle(e.target.value)}
+                            />
+                            <Textarea
+                              placeholder="Forklaring"
+                              value={ruleExplanation}
+                              onChange={(e) => setRuleExplanation(e.target.value)}
+                            />
+                            <Textarea
+                              placeholder='Vilkår (JSON), f.eks {"and":[...]}'
+                              value={ruleConditions}
+                              onChange={(e) => setRuleConditions(e.target.value)}
+                              className="font-mono text-xs"
+                            />
+                            <label className="flex items-center gap-2 text-sm">
+                              <Checkbox checked={ruleIsActive} onCheckedChange={(v) => setRuleIsActive(v === true)} />
+                              Aktiv regel
+                            </label>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => handleCreateRuleFromChunk(chunk.id)}>Lagre regel</Button>
+                              <Button size="sm" variant="ghost" onClick={() => setCreatingRuleForChunk(null)}>Avbryt</Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -539,6 +872,14 @@ export default function SourceDetailPage({
                   <span>{source.domain}</span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-muted-foreground">Hentestatus</span>
+                  <span>{source.fetchStatus || "-"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Hentet</span>
+                  <span>{source.fetchedAt ? new Date(source.fetchedAt).toLocaleString("no-NO") : "-"}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Opprettet</span>
                   <span>{new Date(source.createdAt).toLocaleDateString("no-NO")}</span>
                 </div>
@@ -546,6 +887,11 @@ export default function SourceDetailPage({
                   <span className="text-muted-foreground">Oppdatert</span>
                   <span>{new Date(source.updatedAt).toLocaleDateString("no-NO")}</span>
                 </div>
+                {source.error && (
+                  <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+                    {source.error}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
