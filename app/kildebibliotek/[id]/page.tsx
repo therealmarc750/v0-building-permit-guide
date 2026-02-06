@@ -44,7 +44,7 @@ import {
   Clock,
   RefreshCw,
 } from "lucide-react";
-import type { Source, SourceStatus, SourceCategory, FlowType, ReviewFlags } from "@/lib/sources/types";
+import type { Source, SourceStatus, SourceCategory, FlowType, ReviewFlags, RuleCandidate } from "@/lib/sources/types";
 import { CATEGORY_LABELS, STATUS_LABELS, FLOW_LABELS, REVIEW_FLAG_LABELS, DEFAULT_REVIEW_FLAGS } from "@/lib/sources/types";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -84,6 +84,10 @@ export default function SourceDetailPage({
   const [saving, setSaving] = useState(false);
   const [refetching, setRefetching] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [candidates, setCandidates] = useState<RuleCandidate[]>([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(true);
+  const [generatingCandidates, setGeneratingCandidates] = useState(false);
+  const [candidateError, setCandidateError] = useState("");
 
   // Editable fields
   const [category, setCategory] = useState<SourceCategory | "none">("none");
@@ -97,6 +101,7 @@ export default function SourceDetailPage({
 
   useEffect(() => {
     fetchSource();
+    fetchCandidates();
   }, [id]);
 
   async function fetchSource() {
@@ -120,6 +125,59 @@ export default function SourceDetailPage({
       router.push("/kildebibliotek");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchCandidates() {
+    setLoadingCandidates(true);
+    try {
+      const res = await fetch(`/api/sources/${id}/candidates`);
+      if (!res.ok) {
+        throw new Error("Kunne ikke hente regelutkast");
+      }
+      const data = await res.json();
+      setCandidates(data);
+    } catch (error) {
+      console.error("Failed to fetch candidates:", error);
+    } finally {
+      setLoadingCandidates(false);
+    }
+  }
+
+  async function handleGenerateCandidates() {
+    setGeneratingCandidates(true);
+    setCandidateError("");
+    try {
+      const res = await fetch(`/api/sources/${id}/generate-candidates`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Kunne ikke generere regelutkast");
+      }
+      await fetchCandidates();
+    } catch (error) {
+      setCandidateError(error instanceof Error ? error.message : "Ukjent feil");
+    } finally {
+      setGeneratingCandidates(false);
+    }
+  }
+
+  async function handleCandidateStatus(candidateId: string, status: "approved" | "rejected") {
+    setCandidateError("");
+    try {
+      const res = await fetch(`/api/rule-candidates/${candidateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Kunne ikke oppdatere regelutkast");
+      }
+      await fetchCandidates();
+    } catch (error) {
+      setCandidateError(error instanceof Error ? error.message : "Ukjent feil");
     }
   }
 
@@ -276,8 +334,137 @@ export default function SourceDetailPage({
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-8">
+        {source.fetchStatus === "failed" && (
+          <div className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+            Kunne ikke hente innhold: {source.fetchError || "Ukjent feil"}
+          </div>
+        )}
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-lg">Regelutkast</CardTitle>
+                    <CardDescription>
+                      Utkast generert fra kildeteksten. Godkjenn for å legge til i veiledningen.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleGenerateCandidates}
+                    disabled={generatingCandidates}
+                  >
+                    {generatingCandidates ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Genererer...
+                      </>
+                    ) : (
+                      "Generer regelutkast"
+                    )}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {candidateError && (
+                  <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                    {candidateError}
+                  </div>
+                )}
+                {loadingCandidates ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Laster regelutkast...
+                  </div>
+                ) : candidates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Ingen regelutkast funnet for denne kilden.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {candidates.map((candidate) => (
+                      <div key={candidate.id} className="rounded-lg border p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="font-medium">{candidate.title}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {candidate.explanation}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {candidate.outcome}
+                          </Badge>
+                        </div>
+
+                        <div className="rounded bg-muted/40 p-3 text-xs text-muted-foreground">
+                          <p className="font-medium text-foreground mb-1">Vilkår</p>
+                          <pre className="whitespace-pre-wrap">
+                            {JSON.stringify(candidate.conditions, null, 2)}
+                          </pre>
+                        </div>
+
+                        {candidate.citations.length > 0 && (
+                          <div className="space-y-2 text-sm">
+                            <p className="text-xs font-medium text-muted-foreground">Sitat</p>
+                            {candidate.citations.map((citation, index) => (
+                              <div key={`${candidate.id}-${index}`} className="rounded border p-3">
+                                <p className="text-sm italic text-muted-foreground">
+                                  &quot;{citation.excerpt}&quot;
+                                </p>
+                                <div className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
+                                  {citation.locationHint && (
+                                    <span>Plassering: {citation.locationHint}</span>
+                                  )}
+                                  {source?.url && (
+                                    <a
+                                      href={source.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1 text-primary hover:underline"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                      Åpne kilde
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleCandidateStatus(candidate.id, "approved")}
+                            disabled={candidate.status !== "draft" || !candidate.projectType}
+                          >
+                            Godkjenn
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleCandidateStatus(candidate.id, "rejected")}
+                            disabled={candidate.status !== "draft"}
+                          >
+                            Avvis
+                          </Button>
+                          <span className="text-xs text-muted-foreground">
+                            Status: {candidate.status}
+                          </span>
+                          {!candidate.projectType && (
+                            <span className="text-xs text-amber-600">
+                              Mangler prosjekttype
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Kvalitetssjekk</CardTitle>

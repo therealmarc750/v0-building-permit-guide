@@ -12,56 +12,33 @@ const ALLOWED_DOMAINS = ["oslo.kommune.no", "dibk.no"];
 export default function NewSourcePage() {
   const router = useRouter();
   const [url, setUrl] = useState("");
-  const [fetching, setFetching] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [fetchedData, setFetchedData] = useState<{
-    url: string;
-    domain: string;
-    title: string;
-    fetchedHtml: string;
-    extractedText: string;
-  } | null>(null);
 
-  async function handleFetch() {
+  async function handleAddSource() {
     if (!url) return;
-    setFetching(true);
+    setSubmitting(true);
     setError("");
 
     try {
-      const res = await fetch("/api/sources/fetch", {
+      const res = await fetch("/api/sources/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setFetchedData(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Feil ved henting");
-    } finally {
-      setFetching(false);
-    }
-  }
-
-  async function handleSave() {
-    if (!fetchedData) return;
-    setSaving(true);
-    setError("");
-
-    try {
-      const res = await fetch("/api/sources", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...fetchedData, tags: [] }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      router.push(`/kildebibliotek/${data.id}`);
+      if (!res.ok) {
+        throw new Error(data.error || "Feil ved lagring");
+      }
+      if (data.id) {
+        router.push(`/kildebibliotek/${data.id}`);
+      } else {
+        setError("Kunne ikke opprette kilde");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Feil ved lagring");
-      setSaving(false);
     }
+    setSubmitting(false);
   }
 
   return (
@@ -90,10 +67,10 @@ export default function NewSourcePage() {
                 placeholder="https://dibk.no/..."
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                disabled={fetching || !!fetchedData}
+                disabled={submitting}
               />
-              <Button onClick={handleFetch} disabled={!url || fetching || !!fetchedData}>
-                {fetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Hent"}
+              <Button onClick={handleAddSource} disabled={!url || submitting}>
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Legg til"}
               </Button>
             </div>
 
@@ -101,25 +78,7 @@ export default function NewSourcePage() {
               <p className="text-sm text-destructive">{error}</p>
             )}
 
-            {fetchedData && (
-              <div className="rounded border bg-muted/50 p-4 space-y-2">
-                <p className="font-medium">{fetchedData.title}</p>
-                <p className="text-sm text-muted-foreground">
-                  {fetchedData.extractedText.slice(0, 200)}...
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {Math.round(fetchedData.extractedText.length / 1000)}k tegn hentet
-                </p>
-              </div>
-            )}
-
             <div className="flex gap-2 pt-4">
-              {fetchedData && (
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Lagre kilde
-                </Button>
-              )}
               <Button variant="outline" onClick={() => router.push("/kildebibliotek")}>
                 Avbryt
               </Button>

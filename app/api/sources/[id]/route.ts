@@ -29,6 +29,10 @@ export async function GET(
     title: data.title,
     fetchedHtml: data.fetched_html,
     extractedText: data.extracted_text,
+    fetchedAt: data.fetched_at,
+    fetchStatus: data.fetch_status,
+    fetchError: data.fetch_error,
+    contentHash: data.content_hash,
     status: data.status,
     category: data.category,
     tags: data.tags || [],
@@ -74,6 +78,10 @@ export async function PATCH(
     if (body.fetchedHtml !== undefined) updateData.fetched_html = body.fetchedHtml;
     if (body.extractedText !== undefined) updateData.extracted_text = body.extractedText;
     if (body.title !== undefined) updateData.title = body.title;
+    if (body.fetchStatus !== undefined) updateData.fetch_status = body.fetchStatus;
+    if (body.fetchError !== undefined) updateData.fetch_error = body.fetchError;
+    if (body.fetchedAt !== undefined) updateData.fetched_at = body.fetchedAt;
+    if (body.contentHash !== undefined) updateData.content_hash = body.contentHash;
 
     const { data, error } = await supabase
       .from("sources")
@@ -95,10 +103,14 @@ export async function PATCH(
       id: data.id,
       url: data.url,
       domain: data.domain,
-      title: data.title,
-      fetchedHtml: data.fetched_html,
-      extractedText: data.extracted_text,
-      status: data.status,
+    title: data.title,
+    fetchedHtml: data.fetched_html,
+    extractedText: data.extracted_text,
+    fetchedAt: data.fetched_at,
+    fetchStatus: data.fetch_status,
+    fetchError: data.fetch_error,
+    contentHash: data.content_hash,
+    status: data.status,
       category: data.category,
       tags: data.tags || [],
       internalNotes: data.internal_notes || "",
