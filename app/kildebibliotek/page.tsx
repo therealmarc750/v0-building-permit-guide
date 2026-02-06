@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, ExternalLink, ArrowLeft } from "lucide-react";
 import type { Source, SourceStatus, SourceCategory, FlowType, ReviewFlags } from "@/lib/sources/types";
 import { CATEGORY_LABELS, STATUS_LABELS, FLOW_LABELS } from "@/lib/sources/types";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import Loading from "./loading";
 
@@ -42,6 +42,18 @@ function StatusBadge({ status }: { status: SourceStatus }) {
   );
 }
 
+function FetchStatusBadge({ status }: { status?: Source["fetchStatus"] }) {
+  const label = status === "failed" ? "Feilet" : status === "fetched" ? "Hentet" : "Venter";
+  const className =
+    status === "failed"
+      ? "bg-destructive/15 text-destructive"
+      : status === "fetched"
+        ? "bg-success/15 text-success"
+        : "bg-muted text-muted-foreground";
+
+  return <Badge className={`${className} border-0`}>{label}</Badge>;
+}
+
 export default function KildebibliotekPage() {
   const router = useRouter();
   const [sources, setSources] = useState<Source[]>([]);
@@ -51,6 +63,7 @@ export default function KildebibliotekPage() {
   const [categoryFilter, setCategoryFilter] = useState<SourceCategory | "all">("all");
   const [reviewFilter, setReviewFilter] = useState<"all" | "complete" | "incomplete">("all");
   const [flowFilter, setFlowFilter] = useState<FlowType | "all">("all");
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
   const searchParams = useSearchParams();
 
   // Helper to check if review is complete (3/4 checks)
@@ -72,6 +85,19 @@ export default function KildebibliotekPage() {
       console.error("Failed to fetch sources:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleGenerateCandidates(sourceId: string) {
+    setGeneratingId(sourceId);
+    try {
+      await fetch(`/api/sources/${sourceId}/generate-candidates`, {
+        method: "POST",
+      });
+    } catch (error) {
+      console.error("Failed to generate candidates:", error);
+    } finally {
+      setGeneratingId(null);
     }
   }
 
@@ -225,7 +251,9 @@ export default function KildebibliotekPage() {
                   <TableHead>Kategori</TableHead>
                   <TableHead>Sjekk</TableHead>
                   <TableHead>Flyter</TableHead>
+                  <TableHead>Innhenting</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Utkast</TableHead>
                   <TableHead>Oppdatert</TableHead>
                 </TableRow>
               </TableHeader>
@@ -309,7 +337,22 @@ export default function KildebibliotekPage() {
                       )}
                     </TableCell>
                     <TableCell>
+                      <FetchStatusBadge status={source.fetchStatus} />
+                    </TableCell>
+                    <TableCell>
                       <StatusBadge status={source.status} />
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleGenerateCandidates(source.id)}
+                        disabled={generatingId === source.id}
+                        className="gap-2"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        {generatingId === source.id ? "Genererer..." : "Generer"}
+                      </Button>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(source.updatedAt).toLocaleDateString("no-NO")}

@@ -32,6 +32,20 @@ interface ResultData {
   sources: { title: string; url: string }[]
 }
 
+interface EvaluationResult {
+  matchedRuleId?: string
+  matchedRuleTitle?: string
+  citations?: Array<{
+    sourceId: string
+    chunkId: string
+    excerpt: string
+    locationHint?: string | null
+    sourceUrl?: string
+    sourceTitle?: string
+  }>
+  sources?: { title: string; url: string }[]
+}
+
 // Mock result calculation based on flow and answers
 function calculateResult(
   flow: string,
@@ -323,6 +337,8 @@ function ResultatContent() {
   const [propertyPlans, setPropertyPlans] = useState<
     { title?: string; id?: string }[]
   >([])
+  const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null)
+  const [evaluationError, setEvaluationError] = useState<string | null>(null)
 
   useEffect(() => {
     const storedPlans = sessionStorage.getItem("propertyPlans")
@@ -337,6 +353,35 @@ function ResultatContent() {
       console.error("Kunne ikke lese eiendomsplaner:", error)
     }
   }, [])
+
+  useEffect(() => {
+    if (!flow) return
+    if (!answersParam) return
+
+    async function fetchEvaluation() {
+      try {
+        const res = await fetch("/api/guide/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectType: flow,
+            answers: answersParam ? JSON.parse(answersParam) : {},
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          throw new Error(data.error || "Kunne ikke hente regelgrunnlag")
+        }
+        setEvaluation(data)
+      } catch (error) {
+        setEvaluationError(
+          error instanceof Error ? error.message : "Ukjent feil ved evaluering"
+        )
+      }
+    }
+
+    fetchEvaluation()
+  }, [flow, answersParam])
 
   const answers = answersParam ? JSON.parse(answersParam) : {}
   const result = calculateResult(flow, answers)
@@ -484,6 +529,47 @@ function ResultatContent() {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+        )}
+
+        {evaluation?.citations && evaluation.citations.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium">
+                Relevant utdrag
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {evaluation.citations.map((citation, index) => (
+                <div key={`${citation.chunkId}-${index}`} className="rounded border p-3">
+                  <p className="italic text-muted-foreground">
+                    &quot;{citation.excerpt}&quot;
+                  </p>
+                  <div className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
+                    {citation.locationHint && (
+                      <span>Plassering: {citation.locationHint}</span>
+                    )}
+                    {citation.sourceUrl && (
+                      <a
+                        href={citation.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {citation.sourceTitle || "Kilde"}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {evaluationError && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            {evaluationError}
+          </div>
         )}
 
         {/* Disclaimer */}

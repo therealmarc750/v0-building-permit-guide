@@ -27,10 +27,20 @@ export interface GuidanceRule {
   outcome: Outcome;
   explanation: string;
   sourceIds: string[];
+  citations?: Citation[];
   priority: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Citation {
+  sourceId: string;
+  chunkId: string;
+  excerpt: string;
+  locationHint?: string | null;
+  sourceUrl?: string;
+  sourceTitle?: string;
 }
 
 export interface EvaluateInput {
@@ -42,6 +52,7 @@ export interface EvaluateOutput {
   outcome: Outcome;
   explanation: string;
   sources: unknown[];
+  citations?: Citation[];
   matchedRuleId?: string;
   matchedRuleTitle?: string;
   hint?: string;

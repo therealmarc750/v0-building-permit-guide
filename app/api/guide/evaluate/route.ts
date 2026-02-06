@@ -26,6 +26,7 @@ function mapGuidanceRule(row: Record<string, unknown>): GuidanceRule {
     outcome: row.outcome as GuidanceRule["outcome"],
     explanation: String(row.explanation),
     sourceIds: (row.source_ids as string[]) || [],
+    citations: (row.citations as GuidanceRule["citations"]) || [],
     priority: Number(row.priority),
     isActive: Boolean(row.is_active),
     createdAt: String(row.created_at),
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
       : undefined;
 
     let sources = [] as ReturnType<typeof mapSource>[];
+    let citations = [] as GuidanceRule["citations"];
 
     if (matchedRule && matchedRule.sourceIds.length > 0) {
       const { data: sourceRows, error: sourceError } = await supabase
@@ -116,11 +118,22 @@ export async function POST(request: Request) {
       sources = (sourceRows || []).map((row) =>
         mapSource(row as Record<string, unknown>),
       );
+
+      const sourceMap = new Map(
+        sources.map((source) => [String(source.id), source]),
+      );
+
+      citations = (matchedRule.citations || []).map((citation) => ({
+        ...citation,
+        sourceUrl: sourceMap.get(citation.sourceId)?.url,
+        sourceTitle: sourceMap.get(citation.sourceId)?.title,
+      }));
     }
 
     const response = {
       ...evaluation,
       sources,
+      citations,
       // Frontend: POST { projectType, answers } to this endpoint to evaluate rules.
       hint: "POST /api/guide/evaluate med { projectType, answers }",
     };

@@ -34,6 +34,10 @@ export interface Source {
   title: string;
   fetchedHtml: string;
   extractedText: string;
+  fetchedAt?: string | null;
+  fetchStatus?: "pending" | "fetched" | "failed";
+  fetchError?: string | null;
+  contentHash?: string | null;
   status: SourceStatus;
   category: SourceCategory | null;
   tags: string[];
@@ -62,6 +66,30 @@ export interface UpdateSourceInput {
   reviewFlags?: Partial<ReviewFlags>;
   keyExcerpts?: string[];
   relatedFlows?: FlowType[];
+}
+
+export type RuleCandidateStatus = "draft" | "approved" | "rejected";
+
+export interface RuleCandidate {
+  id: string;
+  sourceId: string;
+  chunkId: string;
+  projectType: string | null;
+  title: string;
+  explanation: string;
+  outcome: "søknadspliktig" | "unntatt" | "avhenger";
+  conditions: unknown;
+  citations: Array<{
+    sourceId: string;
+    chunkId: string;
+    excerpt: string;
+    locationHint?: string | null;
+    sourceUrl?: string;
+    sourceTitle?: string;
+  }>;
+  confidence: number;
+  status: RuleCandidateStatus;
+  createdAt: string;
 }
 
 export const ALLOWED_DOMAINS = ["oslo.kommune.no", "dibk.no"];
