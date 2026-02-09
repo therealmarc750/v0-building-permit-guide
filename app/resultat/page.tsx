@@ -44,7 +44,6 @@ interface EvaluationResult {
     sourceTitle?: string
   }>
   sources?: { title: string; url: string }[]
-  matchedConditions?: Array<{ field: string; op: string; expected: unknown; actual: unknown }>
 }
 
 // Mock result calculation based on flow and answers
@@ -530,25 +529,6 @@ function ResultatContent() {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-        )}
-
-
-        {evaluation?.matchedConditions && evaluation.matchedConditions.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-medium">Hvorfor regelen matchet</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                {evaluation.matchedConditions.map((condition, index) => (
-                  <li key={index} className="rounded border p-2">
-                    <span className="font-medium">{condition.field}</span> {condition.op} {String(condition.expected)}
-                    <span className="text-muted-foreground"> (svar: {String(condition.actual)})</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
         )}
 
         {evaluation?.citations && evaluation.citations.length > 0 && (

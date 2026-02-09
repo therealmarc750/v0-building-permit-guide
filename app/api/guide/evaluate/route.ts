@@ -152,12 +152,8 @@ export async function POST(request: Request) {
 
       citations = (matchedRule.citations || []).map((citation) => ({
         ...citation,
-        sourceUrl: sourceMap.get(citation.sourceId)?.url
-          ? String(sourceMap.get(citation.sourceId)?.url)
-          : undefined,
-        sourceTitle: sourceMap.get(citation.sourceId)?.title
-          ? String(sourceMap.get(citation.sourceId)?.title)
-          : undefined,
+        sourceUrl: sourceMap.get(citation.sourceId)?.url,
+        sourceTitle: sourceMap.get(citation.sourceId)?.title,
       }));
     }
 
@@ -169,7 +165,6 @@ export async function POST(request: Request) {
       ...evaluation,
       sources,
       citations,
-      matchedConditions,
       // Frontend: POST { projectType, answers } to this endpoint to evaluate rules.
       hint: "POST /api/guide/evaluate med { projectType, answers }",
     };

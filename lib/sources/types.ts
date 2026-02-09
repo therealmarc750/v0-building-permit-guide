@@ -35,9 +35,8 @@ export interface Source {
   fetchedHtml: string;
   extractedText: string;
   fetchedAt?: string | null;
-  fetchStatus?: "queued" | "fetching" | "fetched" | "failed";
+  fetchStatus?: "pending" | "fetched" | "failed";
   fetchError?: string | null;
-  error?: string | null;
   contentHash?: string | null;
   status: SourceStatus;
   category: SourceCategory | null;

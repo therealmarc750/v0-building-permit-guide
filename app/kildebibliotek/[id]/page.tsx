@@ -89,16 +89,6 @@ export default function SourceDetailPage({
   const [loadingCandidates, setLoadingCandidates] = useState(true);
   const [generatingCandidates, setGeneratingCandidates] = useState(false);
   const [candidateError, setCandidateError] = useState("");
-  const [chunks, setChunks] = useState<Array<{ id: string; ordinal: number; heading: string | null; text: string }>>([]);
-  const [loadingChunks, setLoadingChunks] = useState(true);
-  const [creatingRuleForChunk, setCreatingRuleForChunk] = useState<string | null>(null);
-  const [ruleProjectType, setRuleProjectType] = useState("garasje");
-  const [ruleOutcome, setRuleOutcome] = useState<"søknadspliktig" | "unntatt" | "avhenger">("avhenger");
-  const [ruleTitle, setRuleTitle] = useState("");
-  const [ruleExplanation, setRuleExplanation] = useState("");
-  const [ruleConditions, setRuleConditions] = useState("{}");
-  const [ruleIsActive, setRuleIsActive] = useState(false);
-  const [ruleError, setRuleError] = useState("");
 
   // Editable fields
   const [category, setCategory] = useState<SourceCategory | "none">("none");
@@ -113,7 +103,6 @@ export default function SourceDetailPage({
   useEffect(() => {
     fetchSource();
     fetchCandidates();
-    fetchChunks();
   }, [id]);
 
   async function fetchChunks() {

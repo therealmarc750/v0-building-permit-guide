@@ -14,7 +14,6 @@ export default function NewSourcePage() {
   const [url, setUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   async function handleAddSource() {
     if (!url) return;
@@ -23,26 +22,24 @@ export default function NewSourcePage() {
     setSuccess("");
 
     try {
-      const res = await fetch("/api/sources/ingest", {
+      const res = await fetch("/api/sources/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-
       const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Ukjent feil ved ingest");
+      if (!res.ok) {
+        throw new Error(data.error || "Feil ved lagring");
       }
-
-      setSuccess(`Kilde hentet. Opprettet ${data.chunks_created} tekstblokker.`);
-      if (data.source?.id) {
-        router.push(`/kildebibliotek/${data.source.id}`);
+      if (data.id) {
+        router.push(`/kildebibliotek/${data.id}`);
+      } else {
+        setError("Kunne ikke opprette kilde");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Feil ved ingest");
-    } finally {
-      setSubmitting(false);
+      setError(err instanceof Error ? err.message : "Feil ved lagring");
     }
+    setSubmitting(false);
   }
 
   return (
@@ -84,14 +81,10 @@ export default function NewSourcePage() {
               </div>
             )}
 
-            {error && (
-              <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                {error}
-              </div>
-            )}
-
             <div className="flex gap-2 pt-4">
-              <Button variant="outline" onClick={() => router.push("/kildebibliotek")}>Avbryt</Button>
+              <Button variant="outline" onClick={() => router.push("/kildebibliotek")}>
+                Avbryt
+              </Button>
             </div>
           </CardContent>
         </Card>

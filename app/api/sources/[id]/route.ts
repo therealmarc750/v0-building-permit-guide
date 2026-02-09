@@ -32,7 +32,6 @@ export async function GET(
     fetchedAt: data.fetched_at,
     fetchStatus: data.fetch_status,
     fetchError: data.fetch_error,
-    error: data.error,
     contentHash: data.content_hash,
     status: data.status,
     category: data.category,
@@ -81,7 +80,6 @@ export async function PATCH(
     if (body.title !== undefined) updateData.title = body.title;
     if (body.fetchStatus !== undefined) updateData.fetch_status = body.fetchStatus;
     if (body.fetchError !== undefined) updateData.fetch_error = body.fetchError;
-    if (body.error !== undefined) updateData.error = body.error;
     if (body.fetchedAt !== undefined) updateData.fetched_at = body.fetchedAt;
     if (body.contentHash !== undefined) updateData.content_hash = body.contentHash;
 
@@ -105,15 +103,14 @@ export async function PATCH(
       id: data.id,
       url: data.url,
       domain: data.domain,
-      title: data.title,
-      fetchedHtml: data.fetched_html,
-      extractedText: data.extracted_text,
-      fetchedAt: data.fetched_at,
-      fetchStatus: data.fetch_status,
-      fetchError: data.fetch_error,
-      error: data.error,
-      contentHash: data.content_hash,
-      status: data.status,
+    title: data.title,
+    fetchedHtml: data.fetched_html,
+    extractedText: data.extracted_text,
+    fetchedAt: data.fetched_at,
+    fetchStatus: data.fetch_status,
+    fetchError: data.fetch_error,
+    contentHash: data.content_hash,
+    status: data.status,
       category: data.category,
       tags: data.tags || [],
       internalNotes: data.internal_notes || "",
