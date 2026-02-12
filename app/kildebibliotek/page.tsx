@@ -271,6 +271,9 @@ export default function KildebibliotekPage() {
                         <ExternalLink className="h-3 w-3" />
                         <span className="truncate max-w-[300px]">{source.url}</span>
                       </div>
+                      <p className="mt-1 text-xs text-muted-foreground/80">
+                        Domene: {source.domain} · Hentet: {source.fetchedAt ? new Date(source.fetchedAt).toLocaleString("no-NO") : "-"}
+                      </p>
                       <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
                         {source.extractedText?.slice(0, 150) || "Ingen innhold hentet"}
                         {source.extractedText && source.extractedText.length > 150 ? "..." : ""}

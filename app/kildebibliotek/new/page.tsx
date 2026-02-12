@@ -19,6 +19,7 @@ export default function NewSourcePage() {
     if (!url) return;
     setSubmitting(true);
     setError("");
+    setSuccess("");
 
     try {
       const res = await fetch("/api/sources/add", {
@@ -74,8 +75,10 @@ export default function NewSourcePage() {
               </Button>
             </div>
 
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
+            {success && (
+              <div className="rounded border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-700">
+                {success}
+              </div>
             )}
 
             <div className="flex gap-2 pt-4">

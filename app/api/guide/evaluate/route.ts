@@ -34,6 +34,33 @@ function mapGuidanceRule(row: Record<string, unknown>): GuidanceRule {
   };
 }
 
+
+function summarizeMatchedConditions(
+  node: GuidanceRule["conditions"],
+  answers: Record<string, unknown>,
+): Array<{ field: string; op: string; expected: unknown; actual: unknown }> {
+  if ("field" in node) {
+    return [
+      {
+        field: node.field,
+        op: node.op,
+        expected: node.value,
+        actual: answers[node.field],
+      },
+    ];
+  }
+
+  if ("and" in node) {
+    return node.and.flatMap((child) => summarizeMatchedConditions(child, answers));
+  }
+
+  if ("or" in node) {
+    return node.or.flatMap((child) => summarizeMatchedConditions(child, answers));
+  }
+
+  return [];
+}
+
 function mapSource(row: Record<string, unknown>) {
   return {
     id: row.id,
@@ -129,6 +156,10 @@ export async function POST(request: Request) {
         sourceTitle: sourceMap.get(citation.sourceId)?.title,
       }));
     }
+
+    const matchedConditions = matchedRule
+      ? summarizeMatchedConditions(matchedRule.conditions, body.answers)
+      : [];
 
     const response = {
       ...evaluation,
