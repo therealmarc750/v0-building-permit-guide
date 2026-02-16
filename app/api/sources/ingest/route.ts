@@ -21,11 +21,9 @@ function toSourcePayload(row: Record<string, unknown>) {
 
 export async function POST(request: Request) {
   let sourceId: string | null = null;
-  let supabase: Awaited<ReturnType<typeof createClient>> | null = null;
+  const supabase = await createClient();
 
   try {
-    supabase = await createClient();
-
     const { url } = await request.json();
 
     if (!url || typeof url !== "string") {
@@ -214,7 +212,7 @@ export async function POST(request: Request) {
           : error.message
         : "Ukjent feil ved ingest";
 
-    if (sourceId && supabase) {
+    if (sourceId) {
       await supabase
         .from("sources")
         .update({ fetch_status: "failed", error: message, fetch_error: message })

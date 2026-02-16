@@ -43,22 +43,13 @@ function StatusBadge({ status }: { status: SourceStatus }) {
 }
 
 function FetchStatusBadge({ status }: { status?: Source["fetchStatus"] }) {
-  const label =
-    status === "failed"
-      ? "Feilet"
-      : status === "fetched"
-        ? "Hentet"
-        : status === "fetching"
-          ? "Henter"
-          : "I kø";
+  const label = status === "failed" ? "Feilet" : status === "fetched" ? "Hentet" : "Venter";
   const className =
     status === "failed"
       ? "bg-destructive/15 text-destructive"
       : status === "fetched"
         ? "bg-success/15 text-success"
-        : status === "fetching"
-          ? "bg-amber-500/15 text-amber-700"
-          : "bg-muted text-muted-foreground";
+        : "bg-muted text-muted-foreground";
 
   return <Badge className={`${className} border-0`}>{label}</Badge>;
 }
