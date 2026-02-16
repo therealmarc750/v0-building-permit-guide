@@ -27,6 +27,7 @@ export default function NewSourcePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
+
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Feil ved lagring");
