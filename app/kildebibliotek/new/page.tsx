@@ -12,55 +12,68 @@ const ALLOWED_DOMAINS = ["oslo.kommune.no", "dibk.no"];
 export default function NewSourcePage() {
   const router = useRouter();
   const [url, setUrl] = useState("");
-  const [fetching, setFetching] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [fetchedData, setFetchedData] = useState<{
-    url: string;
-    domain: string;
-    title: string;
-    fetchedHtml: string;
-    extractedText: string;
-  } | null>(null);
+  const [success, setSuccess] = useState("");
 
-  async function handleFetch() {
+  async function handleAddSource() {
     if (!url) return;
-    setFetching(true);
+    setSubmitting(true);
     setError("");
+    setSuccess("");
 
     try {
-      const res = await fetch("/api/sources/fetch", {
+      const res = await fetch("/api/sources/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setFetchedData(data);
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Ukjent feil ved ingest");
+      }
+
+      setSuccess(`Kilde hentet. Opprettet ${data.chunks_created} tekstblokker.`);
+      if (data.source?.id) {
+        router.push(`/kildebibliotek/${data.source.id}`);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Feil ved henting");
+      setError(err instanceof Error ? err.message : "Feil ved ingest");
     } finally {
-      setFetching(false);
+      setSubmitting(false);
     }
   }
 
-  async function handleSave() {
-    if (!fetchedData) return;
-    setSaving(true);
+  async function handleUploadSource() {
+    if (!file) return;
+    setSubmitting(true);
     setError("");
+    setSuccess("");
 
     try {
-      const res = await fetch("/api/sources", {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/sources/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...fetchedData, tags: [] }),
+        body: formData,
       });
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      router.push(`/kildebibliotek/${data.id}`);
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Ukjent feil ved filopplasting");
+      }
+
+      setSuccess(`Fil lastet opp. Opprettet ${data.chunks_created} tekstblokker.`);
+      if (data.source?.id) {
+        router.push(`/kildebibliotek/${data.source.id}`);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Feil ved lagring");
-      setSaving(false);
+      setError(err instanceof Error ? err.message : "Feil ved filopplasting");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -90,39 +103,44 @@ export default function NewSourcePage() {
                 placeholder="https://dibk.no/..."
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                disabled={fetching || !!fetchedData}
+                disabled={submitting}
               />
-              <Button onClick={handleFetch} disabled={!url || fetching || !!fetchedData}>
-                {fetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Hent"}
+              <Button onClick={handleAddSource} disabled={!url || submitting}>
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Legg til"}
               </Button>
             </div>
 
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
+            <div className="rounded border p-3 space-y-2">
+              <p className="text-sm font-medium">Eller last opp fil fra PC</p>
+              <Input
+                type="file"
+                accept=".txt,.md,.html,.htm,text/plain,text/markdown,text/html"
+                disabled={submitting}
+                onChange={(e) => {
+                  const selected = e.target.files?.[0] || null;
+                  setFile(selected);
+                }}
+              />
+              <Button onClick={handleUploadSource} disabled={!file || submitting} variant="secondary">
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Last opp fil"}
+              </Button>
+              <p className="text-xs text-muted-foreground">Støttede filer: .txt, .md, .html (maks 2 MB)</p>
+            </div>
+
+            {success && (
+              <div className="rounded border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-700">
+                {success}
+              </div>
             )}
 
-            {fetchedData && (
-              <div className="rounded border bg-muted/50 p-4 space-y-2">
-                <p className="font-medium">{fetchedData.title}</p>
-                <p className="text-sm text-muted-foreground">
-                  {fetchedData.extractedText.slice(0, 200)}...
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {Math.round(fetchedData.extractedText.length / 1000)}k tegn hentet
-                </p>
+            {error && (
+              <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
               </div>
             )}
 
             <div className="flex gap-2 pt-4">
-              {fetchedData && (
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Lagre kilde
-                </Button>
-              )}
-              <Button variant="outline" onClick={() => router.push("/kildebibliotek")}>
-                Avbryt
-              </Button>
+              <Button variant="outline" onClick={() => router.push("/kildebibliotek")}>Avbryt</Button>
             </div>
           </CardContent>
         </Card>

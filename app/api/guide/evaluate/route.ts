@@ -26,11 +26,39 @@ function mapGuidanceRule(row: Record<string, unknown>): GuidanceRule {
     outcome: row.outcome as GuidanceRule["outcome"],
     explanation: String(row.explanation),
     sourceIds: (row.source_ids as string[]) || [],
+    citations: (row.citations as GuidanceRule["citations"]) || [],
     priority: Number(row.priority),
     isActive: Boolean(row.is_active),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
+}
+
+
+function summarizeMatchedConditions(
+  node: GuidanceRule["conditions"],
+  answers: Record<string, unknown>,
+): Array<{ field: string; op: string; expected: unknown; actual: unknown }> {
+  if ("field" in node) {
+    return [
+      {
+        field: node.field,
+        op: node.op,
+        expected: node.value,
+        actual: answers[node.field],
+      },
+    ];
+  }
+
+  if ("and" in node) {
+    return node.and.flatMap((child) => summarizeMatchedConditions(child, answers));
+  }
+
+  if ("or" in node) {
+    return node.or.flatMap((child) => summarizeMatchedConditions(child, answers));
+  }
+
+  return [];
 }
 
 function mapSource(row: Record<string, unknown>) {
@@ -98,6 +126,7 @@ export async function POST(request: Request) {
       : undefined;
 
     let sources = [] as ReturnType<typeof mapSource>[];
+    let citations = [] as GuidanceRule["citations"];
 
     if (matchedRule && matchedRule.sourceIds.length > 0) {
       const { data: sourceRows, error: sourceError } = await supabase
@@ -116,11 +145,31 @@ export async function POST(request: Request) {
       sources = (sourceRows || []).map((row) =>
         mapSource(row as Record<string, unknown>),
       );
+
+      const sourceMap = new Map(
+        sources.map((source) => [String(source.id), source]),
+      );
+
+      citations = (matchedRule.citations || []).map((citation) => ({
+        ...citation,
+        sourceUrl: sourceMap.get(citation.sourceId)?.url
+          ? String(sourceMap.get(citation.sourceId)?.url)
+          : undefined,
+        sourceTitle: sourceMap.get(citation.sourceId)?.title
+          ? String(sourceMap.get(citation.sourceId)?.title)
+          : undefined,
+      }));
     }
+
+    const matchedConditions = matchedRule
+      ? summarizeMatchedConditions(matchedRule.conditions, body.answers)
+      : [];
 
     const response = {
       ...evaluation,
       sources,
+      citations,
+      matchedConditions,
       // Frontend: POST { projectType, answers } to this endpoint to evaluate rules.
       hint: "POST /api/guide/evaluate med { projectType, answers }",
     };
